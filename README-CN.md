@@ -1,0 +1,246 @@
+# 阿里云微信小程序基础设施 Terraform 模块
+
+================================================ 
+
+terraform-alicloud-wechat-mini-program-infrastructure
+
+[English](https://github.com/terraform-alicloud-modules/terraform-alicloud-wechat-mini-program-infrastructure/blob/master/README.md) | 简体中文
+
+用于在阿里云上创建完整的微信和支付宝小程序开发基础设施的 Terraform 模块。该模块设置了一个 WordPress 环境，包含所有必要的组件，如 VPC、ECS、RDS MySQL 数据库和自动化的 WordPress 安装。
+
+## 架构
+
+该模块创建了一个综合的基础设施堆栈，包括：
+
+- **VPC 和网络**：创建具有可配置 CIDR 块和子网的虚拟私有云
+- **安全组**：配置 HTTP 和 SSH 访问的网络安全规则
+- **RDS MySQL 数据库**：为 WordPress 数据存储提供托管 MySQL 数据库实例
+- **ECS 实例**：部署带有自动化 WordPress 安装的 CentOS 服务器
+- **WordPress 设置**：自动安装和配置带有 JWT 认证插件的 WordPress
+
+该基础设施旨在为微信和支付宝小程序后端开发提供可扩展和安全的基础。
+
+## 依赖要求
+
+| 名称 | 版本 |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
+| <a name="requirement_alicloud"></a> [alicloud](#requirement\_alicloud) | >= 1.212.0 |
+
+## 使用方法
+
+此模块为微信和支付宝小程序开发创建了一个完整的基础设施堆栈，使用 WordPress 作为后端。该模块自动设置整个环境，包括网络基础设施、计算资源、数据库和 WordPress 安装。
+
+```terraform
+provider "alicloud" {
+  region = "cn-hangzhou"
+}
+
+data "alicloud_db_zones" "rds_zones" {
+  engine                   = "MySQL"
+  engine_version           = "8.0"
+  instance_charge_type     = "PostPaid"
+  category                 = "Basic"
+  db_instance_storage_type = "cloud_essd"
+}
+
+data "alicloud_instance_types" "default" {
+  system_disk_category = "cloud_essd"
+  instance_type_family = "ecs.c6"
+  availability_zone    = data.alicloud_db_zones.rds_zones.zones[0].id
+}
+
+data "alicloud_images" "default" {
+  name_regex  = "^centos_7_9_x64_20G_alibase_*"
+  most_recent = true
+  owners      = "system"
+}
+
+data "alicloud_db_instance_classes" "example" {
+  zone_id                  = data.alicloud_db_zones.rds_zones.zones[0].id
+  engine                   = "MySQL"
+  engine_version           = "8.0"
+  category                 = "Basic"
+  db_instance_storage_type = "cloud_essd"
+  instance_charge_type     = "PostPaid"
+}
+
+module "wechat_mini_program" {
+  source = "alibabacloud-automation/wechat-mini-program-infrastructure/alicloud"
+
+  vpc_config = {
+    cidr_block = "192.168.0.0/16"
+    vpc_name   = "my-mini-program-vpc"
+  }
+
+  vswitch_config = {
+    cidr_block   = "192.168.0.0/24"
+    zone_id      = data.alicloud_db_zones.rds_zones.zones[0].id
+    vswitch_name = "my-mini-program-vswitch"
+  }
+
+  security_group_config = {
+    security_group_name = "my-mini-program-sg"
+    security_group_type = "normal"
+  }
+
+  db_instance_config = {
+    engine                   = "MySQL"
+    engine_version           = "8.0"
+    instance_type            = data.alicloud_db_instance_classes.example.instance_classes[0].instance_class
+    instance_storage         = data.alicloud_db_instance_classes.example.instance_classes[0].storage_range.min
+    db_instance_storage_type = "cloud_essd"
+  }
+
+  db_config = {
+    db_name       = "wordpress"
+    character_set = "utf8mb4"
+    db_user       = "dbuser"
+    account_type  = "Normal"
+    db_password   = "YourSecurePassword123!"
+    privilege     = "ReadWrite"
+  }
+
+  ecs_config = {
+    instance_name              = "my-mini-program-ecs"
+    system_disk_category       = "cloud_efficiency"
+    image_id                   = data.alicloud_images.default.images[0].id
+    password                   = "YourECSPassword123!"
+    instance_type              = data.alicloud_instance_types.default.instance_types[0].id
+    internet_max_bandwidth_out = 5
+  }
+
+  ecs_command_config = {
+    name             = "my-mini-program-command"
+    description      = "WordPress installation command"
+    enable_parameter = false
+    type             = "RunShellScript"
+    timeout          = 3600
+    working_dir      = "/root"
+  }
+
+  # 自定义安装脚本（可选，如果不提供则使用默认的 WordPress 安装）
+  # custom_install_script = <<EOT
+  # #!/bin/bash
+  # echo "运行自定义安装..."
+  # # 在这里添加您的自定义安装命令
+  # EOT
+
+  # 为更严格的访问覆盖安全组规则（可选）
+  # security_group_rules = [
+  #   {
+  #     type        = "ingress"
+  #     ip_protocol = "tcp"
+  #     port_range  = "80/80"
+  #     cidr_ip     = "your-public-ip/32"  # 替换为您的 IP
+  #   },
+  #   {
+  #     type        = "ingress"
+  #     ip_protocol = "tcp"
+  #     port_range  = "22/22"
+  #     cidr_ip     = "your-public-ip/32"  # 替换为您的 IP
+  #   }
+  # ]
+
+  wordpress_config = {
+    user_name  = "admin"
+    password   = "YourWordPressPassword123!"
+    user_email = "admin@example.com"
+  }
+}
+```
+
+## 示例
+
+* [完整示例](https://github.com/alibabacloud-automation/terraform-alicloud-wechat-mini-program-infrastructure/tree/main/examples/complete)
+
+<!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+|------|---------|
+| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
+| <a name="requirement_alicloud"></a> [alicloud](#requirement\_alicloud) | >= 1.212.0 |
+| <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
+
+## Providers
+
+| Name | Version |
+|------|---------|
+| <a name="provider_alicloud"></a> [alicloud](#provider\_alicloud) | 1.270.0 |
+
+## Modules
+
+No modules.
+
+## Resources
+
+| Name | Type |
+|------|------|
+| [alicloud_db_account.rds_account](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/db_account) | resource |
+| [alicloud_db_account_privilege.rds_account_privilege](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/db_account_privilege) | resource |
+| [alicloud_db_database.rds_database](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/db_database) | resource |
+| [alicloud_db_instance.rds_db_instance](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/db_instance) | resource |
+| [alicloud_ecs_command.run_command](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/ecs_command) | resource |
+| [alicloud_ecs_invocation.run_command](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/ecs_invocation) | resource |
+| [alicloud_instance.ecs_instance](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/instance) | resource |
+| [alicloud_security_group.security_group](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/security_group) | resource |
+| [alicloud_security_group_rule.security_group_rules](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/security_group_rule) | resource |
+| [alicloud_vpc.vpc](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/vpc) | resource |
+| [alicloud_vswitch.vswitch](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs/resources/vswitch) | resource |
+
+## Inputs
+
+| Name | Description | Type | Default | Required |
+|------|-------------|------|---------|:--------:|
+| <a name="input_common_name"></a> [common\_name](#input\_common\_name) | The common name used for naming resources | `string` | `"wechat-mini-program"` | no |
+| <a name="input_db_config"></a> [db\_config](#input\_db\_config) | The database configuration including name, user, password and privilege settings. | <pre>object({<br/>    db_name       = string<br/>    character_set = string<br/>    db_user       = string<br/>    account_type  = string<br/>    db_password   = string<br/>    privilege     = string<br/>  })</pre> | <pre>{<br/>  "account_type": "Normal",<br/>  "character_set": "utf8mb4",<br/>  "db_name": "wordpress",<br/>  "db_password": null,<br/>  "db_user": "dbuser",<br/>  "privilege": "ReadWrite"<br/>}</pre> | no |
+| <a name="input_db_instance_config"></a> [db\_instance\_config](#input\_db\_instance\_config) | The parameters of RDS instance. All attributes are required. | <pre>object({<br/>    engine                   = string<br/>    engine_version           = string<br/>    instance_type            = string<br/>    instance_storage         = number<br/>    db_instance_storage_type = string<br/>  })</pre> | <pre>{<br/>  "db_instance_storage_type": "cloud_essd",<br/>  "engine": "MySQL",<br/>  "engine_version": "8.0",<br/>  "instance_storage": null,<br/>  "instance_type": null<br/>}</pre> | no |
+| <a name="input_ecs_command_config"></a> [ecs\_command\_config](#input\_ecs\_command\_config) | The parameters of ECS command configuration. | <pre>object({<br/>    name             = optional(string, null)<br/>    description      = string<br/>    enable_parameter = bool<br/>    type             = string<br/>    timeout          = number<br/>    working_dir      = string<br/>  })</pre> | <pre>{<br/>  "description": "WordPress installation command",<br/>  "enable_parameter": false,<br/>  "name": null,<br/>  "timeout": 3600,<br/>  "type": "RunShellScript",<br/>  "working_dir": "/root"<br/>}</pre> | no |
+| <a name="input_ecs_config"></a> [ecs\_config](#input\_ecs\_config) | The parameters of ECS instance. The attributes 'system\_disk\_category', 'image\_id', 'password', 'instance\_type' and 'internet\_max\_bandwidth\_out' are required. | <pre>object({<br/>    instance_name              = optional(string, null)<br/>    system_disk_category       = string<br/>    image_id                   = string<br/>    password                   = string<br/>    instance_type              = string<br/>    internet_max_bandwidth_out = number<br/>  })</pre> | <pre>{<br/>  "image_id": null,<br/>  "instance_name": null,<br/>  "instance_type": null,<br/>  "internet_max_bandwidth_out": 5,<br/>  "password": null,<br/>  "system_disk_category": "cloud_efficiency"<br/>}</pre> | no |
+| <a name="input_ecs_invocation_config"></a> [ecs\_invocation\_config](#input\_ecs\_invocation\_config) | The parameters of ECS invocation configuration. | <pre>object({<br/>    timeout = string<br/>  })</pre> | <pre>{<br/>  "timeout": "10m"<br/>}</pre> | no |
+| <a name="input_security_group_config"></a> [security\_group\_config](#input\_security\_group\_config) | The parameters of security group. | <pre>object({<br/>    security_group_name = optional(string, null)<br/>    security_group_type = optional(string, "normal")<br/>  })</pre> | <pre>{<br/>  "security_group_name": null,<br/>  "security_group_type": "normal"<br/>}</pre> | no |
+| <a name="input_security_group_rules"></a> [security\_group\_rules](#input\_security\_group\_rules) | The security group rules configuration as a list of objects. | <pre>list(object({<br/>    type        = string<br/>    ip_protocol = string<br/>    port_range  = string<br/>    cidr_ip     = string<br/>  }))</pre> | <pre>[<br/>  {<br/>    "cidr_ip": "0.0.0.0/0",<br/>    "ip_protocol": "tcp",<br/>    "port_range": "80/80",<br/>    "type": "ingress"<br/>  },<br/>  {<br/>    "cidr_ip": "0.0.0.0/0",<br/>    "ip_protocol": "tcp",<br/>    "port_range": "22/22",<br/>    "type": "ingress"<br/>  }<br/>]</pre> | no |
+| <a name="input_vpc_config"></a> [vpc\_config](#input\_vpc\_config) | The parameters of VPC. The attribute 'cidr\_block' is required. | <pre>object({<br/>    cidr_block = string<br/>    vpc_name   = optional(string, null)<br/>  })</pre> | <pre>{<br/>  "cidr_block": "192.168.0.0/16",<br/>  "vpc_name": null<br/>}</pre> | no |
+| <a name="input_vswitch_config"></a> [vswitch\_config](#input\_vswitch\_config) | The parameters of VSwitch. The attributes 'cidr\_block' and 'zone\_id' are required. | <pre>object({<br/>    cidr_block   = string<br/>    zone_id      = string<br/>    vswitch_name = optional(string, null)<br/>  })</pre> | <pre>{<br/>  "cidr_block": "192.168.0.0/24",<br/>  "vswitch_name": null,<br/>  "zone_id": null<br/>}</pre> | no |
+| <a name="input_wordpress_config"></a> [wordpress\_config](#input\_wordpress\_config) | The WordPress administrator configuration including username, password and email. | <pre>object({<br/>    user_name  = string<br/>    password   = string<br/>    user_email = string<br/>  })</pre> | <pre>{<br/>  "password": null,<br/>  "user_email": "admin@example.com",<br/>  "user_name": "admin"<br/>}</pre> | no |
+
+## Outputs
+
+| Name | Description |
+|------|-------------|
+| <a name="output_database_name"></a> [database\_name](#output\_database\_name) | The name of the database |
+| <a name="output_db_connection_string"></a> [db\_connection\_string](#output\_db\_connection\_string) | The connection string of the RDS instance |
+| <a name="output_db_instance_id"></a> [db\_instance\_id](#output\_db\_instance\_id) | The ID of the RDS instance |
+| <a name="output_ecs_command_id"></a> [ecs\_command\_id](#output\_ecs\_command\_id) | The ID of the ECS command |
+| <a name="output_ecs_instance_id"></a> [ecs\_instance\_id](#output\_ecs\_instance\_id) | The ID of the ECS instance |
+| <a name="output_ecs_instance_private_ip"></a> [ecs\_instance\_private\_ip](#output\_ecs\_instance\_private\_ip) | The private IP address of the ECS instance |
+| <a name="output_ecs_instance_public_ip"></a> [ecs\_instance\_public\_ip](#output\_ecs\_instance\_public\_ip) | The public IP address of the ECS instance |
+| <a name="output_ecs_invocation_id"></a> [ecs\_invocation\_id](#output\_ecs\_invocation\_id) | The ID of the ECS invocation |
+| <a name="output_security_group_id"></a> [security\_group\_id](#output\_security\_group\_id) | The ID of the security group |
+| <a name="output_vpc_cidr_block"></a> [vpc\_cidr\_block](#output\_vpc\_cidr\_block) | The CIDR block of the VPC |
+| <a name="output_vpc_id"></a> [vpc\_id](#output\_vpc\_id) | The ID of the VPC |
+| <a name="output_vswitch_id"></a> [vswitch\_id](#output\_vswitch\_id) | The ID of the VSwitch |
+| <a name="output_wordpress_site_url"></a> [wordpress\_site\_url](#output\_wordpress\_site\_url) | The WordPress site URL |
+| <a name="output_wordpress_url"></a> [wordpress\_url](#output\_wordpress\_url) | The WordPress admin access URL |
+<!-- END_TF_DOCS -->
+
+## 提交问题
+
+如果您在使用此模块时遇到任何问题，请提交一个 [provider issue](https://github.com/aliyun/terraform-provider-alicloud/issues/new) 并告知我们。
+
+**注意：** 不建议在此仓库中提交问题。
+
+## 作者
+
+由阿里云 Terraform 团队创建和维护(terraform@alibabacloud.com)。
+
+## 许可证
+
+MIT 许可。有关完整详细信息，请参阅 LICENSE。
+
+## 参考
+
+* [Terraform-Provider-Alicloud Github](https://github.com/aliyun/terraform-provider-alicloud)
+* [Terraform-Provider-Alicloud Release](https://releases.hashicorp.com/terraform-provider-alicloud/)
+* [Terraform-Provider-Alicloud Docs](https://registry.terraform.io/providers/aliyun/alicloud/latest/docs)
