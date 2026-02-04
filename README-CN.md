@@ -1,31 +1,11 @@
-# 阿里云微信小程序基础设施 Terraform 模块
+阿里云微信小程序基础设施 Terraform 模块
 
-================================================ 
+# terraform-alicloud-wechat-mini-program-infrastructure
 
-terraform-alicloud-wechat-mini-program-infrastructure
-
-[English](https://github.com/terraform-alicloud-modules/terraform-alicloud-wechat-mini-program-infrastructure/blob/master/README.md) | 简体中文
+[English](https://github.com/alibabacloud-automation/terraform-alicloud-wechat-mini-program-infrastructure/blob/main/README.md) | 简体中文
 
 用于在阿里云上创建完整的微信和支付宝小程序开发基础设施的 Terraform 模块。该模块设置了一个 WordPress 环境，包含所有必要的组件，如 VPC、ECS、RDS MySQL 数据库和自动化的 WordPress 安装。
 
-## 架构
-
-该模块创建了一个综合的基础设施堆栈，包括：
-
-- **VPC 和网络**：创建具有可配置 CIDR 块和子网的虚拟私有云
-- **安全组**：配置 HTTP 和 SSH 访问的网络安全规则
-- **RDS MySQL 数据库**：为 WordPress 数据存储提供托管 MySQL 数据库实例
-- **ECS 实例**：部署带有自动化 WordPress 安装的 CentOS 服务器
-- **WordPress 设置**：自动安装和配置带有 JWT 认证插件的 WordPress
-
-该基础设施旨在为微信和支付宝小程序后端开发提供可扩展和安全的基础。
-
-## 依赖要求
-
-| 名称 | 版本 |
-|------|---------|
-| <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
-| <a name="requirement_alicloud"></a> [alicloud](#requirement\_alicloud) | >= 1.212.0 |
 
 ## 使用方法
 
@@ -119,29 +99,6 @@ module "wechat_mini_program" {
     working_dir      = "/root"
   }
 
-  # 自定义安装脚本（可选，如果不提供则使用默认的 WordPress 安装）
-  # custom_install_script = <<EOT
-  # #!/bin/bash
-  # echo "运行自定义安装..."
-  # # 在这里添加您的自定义安装命令
-  # EOT
-
-  # 为更严格的访问覆盖安全组规则（可选）
-  # security_group_rules = [
-  #   {
-  #     type        = "ingress"
-  #     ip_protocol = "tcp"
-  #     port_range  = "80/80"
-  #     cidr_ip     = "your-public-ip/32"  # 替换为您的 IP
-  #   },
-  #   {
-  #     type        = "ingress"
-  #     ip_protocol = "tcp"
-  #     port_range  = "22/22"
-  #     cidr_ip     = "your-public-ip/32"  # 替换为您的 IP
-  #   }
-  # ]
-
   wordpress_config = {
     user_name  = "admin"
     password   = "YourWordPressPassword123!"
@@ -167,7 +124,7 @@ module "wechat_mini_program" {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_alicloud"></a> [alicloud](#provider\_alicloud) | 1.270.0 |
+| <a name="provider_alicloud"></a> [alicloud](#provider\_alicloud) | >= 1.212.0 |
 
 ## Modules
 
@@ -193,16 +150,16 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
-| <a name="input_common_name"></a> [common\_name](#input\_common\_name) | The common name used for naming resources | `string` | `"wechat-mini-program"` | no |
+| <a name="input_custom_install_script"></a> [custom\_install\_script](#input\_custom\_install\_script) | Custom installation script to run on ECS instance. If not provided, the default WordPress installation script will be used. | `string` | `null` | no |
 | <a name="input_db_config"></a> [db\_config](#input\_db\_config) | The database configuration including name, user, password and privilege settings. | <pre>object({<br/>    db_name       = string<br/>    character_set = string<br/>    db_user       = string<br/>    account_type  = string<br/>    db_password   = string<br/>    privilege     = string<br/>  })</pre> | <pre>{<br/>  "account_type": "Normal",<br/>  "character_set": "utf8mb4",<br/>  "db_name": "wordpress",<br/>  "db_password": null,<br/>  "db_user": "dbuser",<br/>  "privilege": "ReadWrite"<br/>}</pre> | no |
 | <a name="input_db_instance_config"></a> [db\_instance\_config](#input\_db\_instance\_config) | The parameters of RDS instance. All attributes are required. | <pre>object({<br/>    engine                   = string<br/>    engine_version           = string<br/>    instance_type            = string<br/>    instance_storage         = number<br/>    db_instance_storage_type = string<br/>  })</pre> | <pre>{<br/>  "db_instance_storage_type": "cloud_essd",<br/>  "engine": "MySQL",<br/>  "engine_version": "8.0",<br/>  "instance_storage": null,<br/>  "instance_type": null<br/>}</pre> | no |
-| <a name="input_ecs_command_config"></a> [ecs\_command\_config](#input\_ecs\_command\_config) | The parameters of ECS command configuration. | <pre>object({<br/>    name             = optional(string, null)<br/>    description      = string<br/>    enable_parameter = bool<br/>    type             = string<br/>    timeout          = number<br/>    working_dir      = string<br/>  })</pre> | <pre>{<br/>  "description": "WordPress installation command",<br/>  "enable_parameter": false,<br/>  "name": null,<br/>  "timeout": 3600,<br/>  "type": "RunShellScript",<br/>  "working_dir": "/root"<br/>}</pre> | no |
+| <a name="input_ecs_command_config"></a> [ecs\_command\_config](#input\_ecs\_command\_config) | The parameters of ECS command configuration. | <pre>object({<br/>    name             = optional(string, "wordpress-install")<br/>    description      = string<br/>    enable_parameter = bool<br/>    type             = string<br/>    timeout          = number<br/>    working_dir      = string<br/>  })</pre> | <pre>{<br/>  "description": "WordPress installation command",<br/>  "enable_parameter": false,<br/>  "name": "wordpress-install",<br/>  "timeout": 3600,<br/>  "type": "RunShellScript",<br/>  "working_dir": "/root"<br/>}</pre> | no |
 | <a name="input_ecs_config"></a> [ecs\_config](#input\_ecs\_config) | The parameters of ECS instance. The attributes 'system\_disk\_category', 'image\_id', 'password', 'instance\_type' and 'internet\_max\_bandwidth\_out' are required. | <pre>object({<br/>    instance_name              = optional(string, null)<br/>    system_disk_category       = string<br/>    image_id                   = string<br/>    password                   = string<br/>    instance_type              = string<br/>    internet_max_bandwidth_out = number<br/>  })</pre> | <pre>{<br/>  "image_id": null,<br/>  "instance_name": null,<br/>  "instance_type": null,<br/>  "internet_max_bandwidth_out": 5,<br/>  "password": null,<br/>  "system_disk_category": "cloud_efficiency"<br/>}</pre> | no |
 | <a name="input_ecs_invocation_config"></a> [ecs\_invocation\_config](#input\_ecs\_invocation\_config) | The parameters of ECS invocation configuration. | <pre>object({<br/>    timeout = string<br/>  })</pre> | <pre>{<br/>  "timeout": "10m"<br/>}</pre> | no |
-| <a name="input_security_group_config"></a> [security\_group\_config](#input\_security\_group\_config) | The parameters of security group. | <pre>object({<br/>    security_group_name = optional(string, null)<br/>    security_group_type = optional(string, "normal")<br/>  })</pre> | <pre>{<br/>  "security_group_name": null,<br/>  "security_group_type": "normal"<br/>}</pre> | no |
+| <a name="input_security_group_config"></a> [security\_group\_config](#input\_security\_group\_config) | The parameters of security group. | <pre>object({<br/>    security_group_name = optional(string, null)<br/>    security_group_type = optional(string, "normal")<br/>  })</pre> | n/a | yes |
 | <a name="input_security_group_rules"></a> [security\_group\_rules](#input\_security\_group\_rules) | The security group rules configuration as a list of objects. | <pre>list(object({<br/>    type        = string<br/>    ip_protocol = string<br/>    port_range  = string<br/>    cidr_ip     = string<br/>  }))</pre> | <pre>[<br/>  {<br/>    "cidr_ip": "0.0.0.0/0",<br/>    "ip_protocol": "tcp",<br/>    "port_range": "80/80",<br/>    "type": "ingress"<br/>  },<br/>  {<br/>    "cidr_ip": "0.0.0.0/0",<br/>    "ip_protocol": "tcp",<br/>    "port_range": "22/22",<br/>    "type": "ingress"<br/>  }<br/>]</pre> | no |
-| <a name="input_vpc_config"></a> [vpc\_config](#input\_vpc\_config) | The parameters of VPC. The attribute 'cidr\_block' is required. | <pre>object({<br/>    cidr_block = string<br/>    vpc_name   = optional(string, null)<br/>  })</pre> | <pre>{<br/>  "cidr_block": "192.168.0.0/16",<br/>  "vpc_name": null<br/>}</pre> | no |
-| <a name="input_vswitch_config"></a> [vswitch\_config](#input\_vswitch\_config) | The parameters of VSwitch. The attributes 'cidr\_block' and 'zone\_id' are required. | <pre>object({<br/>    cidr_block   = string<br/>    zone_id      = string<br/>    vswitch_name = optional(string, null)<br/>  })</pre> | <pre>{<br/>  "cidr_block": "192.168.0.0/24",<br/>  "vswitch_name": null,<br/>  "zone_id": null<br/>}</pre> | no |
+| <a name="input_vpc_config"></a> [vpc\_config](#input\_vpc\_config) | The parameters of VPC. The attribute 'cidr\_block' is required. | <pre>object({<br/>    cidr_block = string<br/>    vpc_name   = optional(string, null)<br/>  })</pre> | n/a | yes |
+| <a name="input_vswitch_config"></a> [vswitch\_config](#input\_vswitch\_config) | The parameters of VSwitch. The attributes 'cidr\_block' and 'zone\_id' are required. | <pre>object({<br/>    cidr_block   = string<br/>    zone_id      = string<br/>    vswitch_name = optional(string, null)<br/>  })</pre> | n/a | yes |
 | <a name="input_wordpress_config"></a> [wordpress\_config](#input\_wordpress\_config) | The WordPress administrator configuration including username, password and email. | <pre>object({<br/>    user_name  = string<br/>    password   = string<br/>    user_email = string<br/>  })</pre> | <pre>{<br/>  "password": null,<br/>  "user_email": "admin@example.com",<br/>  "user_name": "admin"<br/>}</pre> | no |
 
 ## Outputs

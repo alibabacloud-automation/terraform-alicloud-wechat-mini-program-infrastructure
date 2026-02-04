@@ -5,10 +5,6 @@ variable "vpc_config" {
     vpc_name   = optional(string, null)
   })
   description = "The parameters of VPC. The attribute 'cidr_block' is required."
-  default = {
-    cidr_block = "192.168.0.0/16"
-    vpc_name   = null
-  }
 }
 
 variable "vswitch_config" {
@@ -18,16 +14,6 @@ variable "vswitch_config" {
     vswitch_name = optional(string, null)
   })
   description = "The parameters of VSwitch. The attributes 'cidr_block' and 'zone_id' are required."
-  default = {
-    cidr_block   = "192.168.0.0/24"
-    zone_id      = null
-    vswitch_name = null
-  }
-
-  validation {
-    condition     = can(cidrhost(var.vswitch_config.cidr_block, 0))
-    error_message = "The vswitch_config.cidr_block must be a valid CIDR block."
-  }
 }
 
 variable "security_group_config" {
@@ -36,10 +22,6 @@ variable "security_group_config" {
     security_group_type = optional(string, "normal")
   })
   description = "The parameters of security group."
-  default = {
-    security_group_name = null
-    security_group_type = "normal"
-  }
 }
 
 variable "security_group_rules" {
@@ -135,7 +117,7 @@ variable "custom_install_script" {
 
 variable "ecs_command_config" {
   type = object({
-    name             = optional(string, null)
+    name             = optional(string, "wordpress-install")
     description      = string
     enable_parameter = bool
     type             = string
@@ -144,7 +126,7 @@ variable "ecs_command_config" {
   })
   description = "The parameters of ECS command configuration."
   default = {
-    name             = null
+    name             = "wordpress-install"
     description      = "WordPress installation command"
     enable_parameter = false
     type             = "RunShellScript"
